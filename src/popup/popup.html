@@ -5,11 +5,23 @@
     <link rel="stylesheet" type="text/css" href="popup.css">
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   </head>
-  <body class="flex items-center justify-center h-screen bg-gray-100">
-    <div class="bg-white p-6 rounded-lg shadow-lg w-1/3">
-      <h1 class="text-2xl font-bold mb-4 text-center">Test extension</h1>
+  <body class="flex items-center justify-center bg-gray-200">
+    <div class="bg-gray-100 p-6 rounded-lg shadow-lg">
+      <h1 class="text-lg font-bold mb-4 text-center">BrainRot Killer</h1>
+      <div class="flex justify-center mb-4">
+        <button id="btnTest" class="bg-blue-500 text-white px-4 py-2 rounded mx-4">Test</button>
+        <button id="btnOnOff" class="bg-green-500 text-white px-4 py-2 rounded mx-4">Start</button>
+      </div>
       <div class="flex justify-center">
-        <button id="btnTest" class="bg-blue-500 text-white px-4 py-2 rounded">test</button>
+        <label for="timeSelect" class="mr-2 items-center text-sm">Time (minutes):</label>
+        <select id="timeSelect" class="bg-gray-200 text-gray-700 px-4 rounded">
+          <option value="0">0</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="5">5</option>
+          <option value="15">15</option>
+        </select>
+        <button id="btnValidate" class="bg-blue-500 text-sm text-white px-4 py-2 rounded ml-2">Validate</button>
       </div>
       <script src="./popup.js"></script>
     </div>

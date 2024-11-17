@@ -3,7 +3,7 @@
   "name": "BrainRot Killer",
   "version": "1.0",
   "description": "A Chrome extension to kill BrainRot content",
-  "permissions": ["scripting", "activeTab"],
+  "permissions": ["scripting", "activeTab", "storage"],
   "action":{
     "default_popup": "./src/popup/popup.html",
     "default_icon": "./assets/brainrot_killer_icon.jpg"
