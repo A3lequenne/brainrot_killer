@@ -1,12 +1,12 @@
 {
-  "manifest_version": 0,
+  "manifest_version": 3,
   "name": "BrainRot Killer",
   "version": "1.0",
-  "description": "A Chrome extension to kill BrainRot",
-  "permissions": [],
+  "description": "A Chrome extension to kill BrainRot content",
+  "permissions": ["scripting", "activeTab"],
   "action":{
     "default_popup": "./src/popup/popup.html",
-    "default_icon": "./assets/brainrot-killer.png"
+    "default_icon": "./assets/brainrot_killer_icon.jpg"
   },
   "background": {
     "service_worker": "./src/background/background.js"
