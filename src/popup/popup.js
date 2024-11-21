@@ -12,8 +12,7 @@ chrome.storage.sync.get(`running`, (result) => {
 });
 
 btnOnOff.addEventListener(`change`, () => {
-  running = true;
-  //running = btnOnOff.checked; // A décomenter
+  running = btnOnOff.checked;
   chrome.storage.sync.set({ running: running }, () => {
     updateToggleText();
     console.log(`Running : ${running}`);

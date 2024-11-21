@@ -1,23 +1,20 @@
 // Initial setup
 let settings = {
   running: false, // Not activated by default
-  selectedTime: 0, // 15 minutes by default A changer
-  resetTimerTime: 0 // 10 minutes by default A changer
+  selectedTime: 0.25, // 15 minutes by default A changer
+  resetTimerTime: 0.5 // 10 minutes by default A changer
 };
 
 chrome.storage.sync.get([`running`, `selectedTime`, `resetTimerTime`], (result) => {
   settings.running = result.running; 
   settings.selectedTime = result.selectedTime;
   settings.resetTimerTime = result.resetTimerTime;
-  
-  if (settings.selectedTime === 0) settings.selectedTime = 0.25;
-  if (settings.resetTimerTime === 0) settings.resetTimerTime = 2;
 
   console.log(`settings.running: ${settings.running}`);
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.set({ running: false, selectedTime: 0, resetTimerTime: 0 }, () => { // Changer les valeurs d'initialisation
+  chrome.storage.sync.set({ running: false, selectedTime: 0.25, resetTimerTime: 0.5 }, () => { // Changer les valeurs d'initialisation
     console.log("Running state reset to false on installation.");
   });
 });
@@ -45,24 +42,32 @@ function checkStartUrl(tab) {
 }
 
 // Timer Handler
-let timerId;
 let resetTimerId;
+let intervalId;
+let timeRemaining = settings.selectedTime * 60 * 1000;
+let blocked = false;
 
 function startTimer(tabId) {
   console.log(`Timer started!`);
-  timerId = setTimeout(() => {
-    chrome.scripting.executeScript({
-      target: { tabId: tabId },
-      files: ["./src/content/content.js"]
-    });
-  }, settings.selectedTime * 60 * 1000);
+  intervalId = setInterval(() => {
+    timeRemaining -= 1000;
+    if (timeRemaining <= 0) {
+      clearInterval(intervalId);
+      console.log(`Timer finished!`);
+      blocked = true;
+      chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ["./src/content/content.js"]
+      });
+    }
+  }, 1000);
 }
 
-function stopTimer() {
-  if (timerId) {
-    clearTimeout(timerId);
-    timerId = null;
-    console.log(`Timer stopped and reset!`);
+function pauseTimer() {
+  if (intervalId) {
+    clearInterval(intervalId);
+    intervalId = null;
+    console.log(`Timer paused/stopped with ${timeRemaining / 1000} seconds remaining!`);
   }
 }
 
@@ -72,16 +77,25 @@ function startResetTimer() {
   }
   resetTimerId = setTimeout(() => {
     console.log(`Reset Timer started!`);
-    stopTimer();
+    pauseTimer();
+    timeRemaining = settings.selectedTime * 60 * 1000;
+    blocked = false;
   }, settings.resetTimerTime * 60 * 1000);
 }
 
 // Events handlers
 function handleTabUpdate(tabId, changeInfo, tab) {
-  chrome.storage.sync.get("running", (result) => {
+  chrome.storage.sync.get(`running`, (result) => {
     if (result.running) {
-      if (changeInfo.status === "complete" && checkStartUrl(tab)) {
+      if (changeInfo.status === `complete` && checkStartUrl(tab)) {
         startTimer(tabId);
+        if (resetTimerId) {
+          clearTimeout(resetTimerId);
+          resetTimerId = null;
+        }
+      }
+      else {
+        pauseTimer();
         startResetTimer();
       }
     }
@@ -90,7 +104,7 @@ function handleTabUpdate(tabId, changeInfo, tab) {
 
 function handleTabActivated(activeInfo) {
   chrome.tabs.get(activeInfo.tabId, (tab) => {
-    chrome.storage.sync.get("running", (result) => {
+    chrome.storage.sync.get(`running`, (result) => {
       if (result.running) {
         console.log(`Tab activated!: ${tab.url}`);
         if (checkStartUrl(tab)) {
@@ -99,8 +113,9 @@ function handleTabActivated(activeInfo) {
             clearTimeout(resetTimerId);
             resetTimerId = null;
           }
-        } else {
-          stopTimer();
+        } 
+        else {
+          pauseTimer();
           startResetTimer();
         }
       }
