@@ -1,6 +1,6 @@
 // Initial setup
 let blocked = false;
-let toBeUnblocked = new Map();
+let toBeUnblocked = new Map(); // A enlever, mettre un tableau à la place
 let lastUrlByTab = {};
 let settings = {
   running: false, // Not activated by default
