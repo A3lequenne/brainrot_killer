@@ -1,9 +1,28 @@
+// Initial setup
 let settings = {
   running: false, // Not activated by default
-  selectedTime: 0, // 15 minutes by default
-  resetTimerTime: 0 // 10 minutes by default
+  selectedTime: 0, // 15 minutes by default A changer
+  resetTimerTime: 0 // 10 minutes by default A changer
 };
 
+chrome.storage.sync.get([`running`, `selectedTime`, `resetTimerTime`], (result) => {
+  settings.running = result.running; 
+  settings.selectedTime = result.selectedTime;
+  settings.resetTimerTime = result.resetTimerTime;
+  
+  if (settings.selectedTime === 0) settings.selectedTime = 0.25;
+  if (settings.resetTimerTime === 0) settings.resetTimerTime = 2;
+
+  console.log(`settings.running: ${settings.running}`);
+});
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.sync.set({ running: false, selectedTime: 0, resetTimerTime: 0 }, () => { // Changer les valeurs d'initialisation
+    console.log("Running state reset to false on installation.");
+  });
+});
+
+// Utils
 let notWantedUrls = [
   "https://www.youtube.com/shorts", 
   "https://www.facebook.com/reel", 
@@ -12,32 +31,38 @@ let notWantedUrls = [
 ];
 
 function checkStartUrl(tab) {
+  if (!tab.url) {
+    console.log(`No URL found!`);
+    return false;
+  }
   for (let url of notWantedUrls) {
     if (tab.url.startsWith(url)) {
       return true;
     }
   }
+  console.log(`URL not found in the tab!`);
   return false;
 }
 
+// Timer Handler
 let timerId;
 let resetTimerId;
 
 function startTimer(tabId) {
-  console.log("Timer started!");
+  console.log(`Timer started!`);
   timerId = setTimeout(() => {
     chrome.scripting.executeScript({
       target: { tabId: tabId },
-      files: ["../content/content.js"]
+      files: ["./src/content/content.js"]
     });
-  }, selectedTime * 60 * 1000);
+  }, settings.selectedTime * 60 * 1000);
 }
 
 function stopTimer() {
   if (timerId) {
     clearTimeout(timerId);
     timerId = null;
-    console.log("Timer stopped and reset!");
+    console.log(`Timer stopped and reset!`);
   }
 }
 
@@ -46,45 +71,43 @@ function startResetTimer() {
     clearTimeout(resetTimerId);
   }
   resetTimerId = setTimeout(() => {
-    console.log("Reset Timer started!");
+    console.log(`Reset Timer started!`);
     stopTimer();
-  }, 10 * 60 * 1000);
+  }, settings.resetTimerTime * 60 * 1000);
 }
 
-chrome.storage.sync.get(["running", "selectedTime", "resetTimerTime"], (result) => {
-  if (result.running !== undefined) settings.running = result.running;
-  if (result.selectedTime !== undefined) settings.selectedTime = result.selectedTime;
-  if (result.resetTimerTime !== undefined) settings.resetTimerTime = result.resetTimerTime;
-  
-  if (settings.selectedTime === 0) settings.selectedTime = 0.2;
-  if (settings.resetTimerTime === 0) settings.resetTimerTime = 1;
-
-  if (settings.running) {
-    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+// Events handlers
+function handleTabUpdate(tabId, changeInfo, tab) {
+  chrome.storage.sync.get("running", (result) => {
+    if (result.running) {
       if (changeInfo.status === "complete" && checkStartUrl(tab)) {
         startTimer(tabId);
         startResetTimer();
       }
-    });
+    }
+  });
+}
 
-    chrome.tabs.onActivated.addListener((activeInfo) => {
-      chrome.tabs.get(activeInfo.tabId, (tab) => {
+function handleTabActivated(activeInfo) {
+  chrome.tabs.get(activeInfo.tabId, (tab) => {
+    chrome.storage.sync.get("running", (result) => {
+      if (result.running) {
+        console.log(`Tab activated!: ${tab.url}`);
         if (checkStartUrl(tab)) {
           startTimer(tab.id);
           if (resetTimerId) {
-            clearTimeout(resetTimeoutId);
+            clearTimeout(resetTimerId);
             resetTimerId = null;
           }
-        }
-        else {
+        } else {
           stopTimer();
           startResetTimer();
         }
-      });
+      }
     });
-  }
-});
+  });
+}
 
-chrome.runtime.onInstalled.addListener(() => {
-  console.log("Extension installed!");
-});
+// Events listerners
+chrome.tabs.onUpdated.addListener(handleTabUpdate);
+chrome.tabs.onActivated.addListener(handleTabActivated);

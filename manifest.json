@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "BrainRot Killer",
   "version": "1.0",
-  "description": "A Chrome extension to kill BrainRot content",
+  "description": "A Chrome extension to kill DoomScroll content",
   "permissions": ["scripting", "activeTab", "storage"],
   "action":{
     "default_popup": "./src/popup/popup.html",
@@ -10,11 +10,5 @@
   },
   "background": {
     "service_worker": "./src/background/background.js"
-  },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["./src/content/content.js"]
-    }
-  ]
+  }
 }
