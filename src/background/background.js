@@ -64,10 +64,9 @@ let alreadyRunning = false;
 
 function startTimer(tabId) {
   if (alreadyRunning) {
-    console.log(`Already cooking!`);
     return ;
   }
-  console.log(`Timer started with ${timeRemaining / 1000} seconds remaining!`);
+  console.log(`Timer started!`);
   alreadyRunning = true;
   intervalId = setInterval(() => {
     timeRemaining -= 1000;
@@ -78,7 +77,7 @@ function startTimer(tabId) {
       startResetTimer();
       chrome.scripting.executeScript({
         target: { tabId: tabId },
-        files: ["./src/content/blurScreen.js"]
+        files: ["./src/content/content.js"]
       });
     }
   }, 1000);
@@ -99,52 +98,91 @@ function startResetTimer() {
   }
   console.log(`Reset Timer started!`);
   resetTimerId = setTimeout(() => {
-    timeRemaining = settings.selectedTime * 60 * 1000;
     pauseTimer();
-    alreadyRunning = false;
+    timeRemaining = settings.selectedTime * 60 * 1000;
     blocked = false;
   }, settings.resetTimerTime * 60 * 1000);
 }
 
 // Events handlers
-function handleTabEvent(tabId, tab, eventType) {
+function handleTabUpdate(tabId, changeInfo, tab) {
   chrome.storage.sync.get(`running`, (result) => {
-    if (!result.running || blocked) return;
-
-    if (checkStartUrl(tab)) {
-      if (!checkLastUrl(tab)) {
-        console.log(`[${eventType}] Detected and matched: ${tab.url}`);
-        startTimer(tabId);
-        if (resetTimerId) {
-          clearTimeout(resetTimerId);
-          resetTimerId = null;
+    if (result.running && !blocked) {
+      if (changeInfo.status === `complete` && checkStartUrl(tab)) {
+        if (checkLastUrl(tab)) {
+          console.log(`Tab updated!: ${tab.url}`);
+          startTimer(tabId);
+          if (resetTimerId) {
+            clearTimeout(resetTimerId);
+            resetTimerId = null;
+          }
         }
       }
-    } else {
-      console.log(`[${eventType}] URL not in blocklist or already processed: ${tab.url}`);
-      if (intervalId) {
-        pauseTimer();
-        startResetTimer();
+      else {
+        if (intervalId && !alreadyRunning) {
+          console.log("1");
+          pauseTimer()
+          startResetTimer();
+        }
       }
     }
   });
 }
 
-// Adapter les événements pour utiliser handleTabEvent
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete') {
-    handleTabEvent(tabId, tab, 'onUpdated');
-  }
-});
-
-chrome.tabs.onActivated.addListener((activeInfo) => {
+function handleTabActivated(activeInfo) {
   chrome.tabs.get(activeInfo.tabId, (tab) => {
-    handleTabEvent(activeInfo.tabId, tab, 'onActivated');
+    chrome.storage.sync.get(`running`, (result) => {
+      if (result.running && !blocked) {
+        console.log(`Tab activated!: ${tab.url}`);
+        if (checkStartUrl(tab)) {
+          if (checkLastUrl(tab)) {
+            startTimer(tab.id);
+            if (resetTimerId) {
+              clearTimeout(resetTimerId);
+              resetTimerId = null;
+            }
+          }
+        } 
+        else {
+          if (intervalId) {
+            console.log("2");
+            pauseTimer();
+            startResetTimer();
+          }
+        } 
+      }
+    });
   });
-});
+}
 
-chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
-  chrome.tabs.get(details.tabId, (tab) => {
-    handleTabEvent(details.tabId, tab, 'onHistoryStateUpdated');
+function handleHistoryStateUpdate(details) {
+  chrome.storage.sync.get('running', (result) => {
+    if (result.running && !blocked) {
+      chrome.tabs.get(details.tabId, (tab) => {
+        if (checkStartUrl(tab)) {
+          if (!checkLastUrl(tab)) {
+            console.log(`SPA navigation detected and matched: ${tab.url}`);
+            startTimer(tab.id);
+            if (resetTimerId) {
+              clearTimeout(resetTimerId);
+              resetTimerId = null;
+            }
+          }
+        } 
+        else {
+          console.log(`SPA navigation detected but not in blocklist: ${tab.url}`);
+          if (intervalId) {
+            console.log("3");
+            pauseTimer();
+            startResetTimer();
+          }
+        }
+      });
+    }
   });
-});
+}
+
+// Events listerners
+chrome.tabs.onUpdated.addListener(handleTabUpdate);
+chrome.tabs.onActivated.addListener(handleTabActivated);
+chrome.webNavigation.onHistoryStateUpdated.addListener(handleHistoryStateUpdate);
