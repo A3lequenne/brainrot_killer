@@ -1,4 +1,5 @@
 // Initial setup
+let blocked = false;
 let lastUrlByTab = {};
 let settings = {
   running: false, // Not activated by default
@@ -16,7 +17,6 @@ chrome.storage.sync.get([`running`, `selectedTime`, `resetTimerTime`], (result) 
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.storage.sync.set({ running: false, selectedTime: 0.25, resetTimerTime: 0.5 }, () => { // Changer les valeurs d'initialisation
-    console.log("Running state reset to false on installation.");
   });
 });
 
@@ -44,29 +44,36 @@ function checkStartUrl(tab) {
   return false;
 }
 
-function checkLastUrl(tab) {
-  if (lastUrlByTab[tab.id]) {
-    if (tab.url === lastUrlByTab[tab.id]) {
-      console.log(`URL matched with last URL in the tab!`);
-      return true;
-    }
-  }
-  console.log(`URL not matched with last URL in the tab!`);
-  return false;
+// function checkLastUrl(tab) {
+//   if (lastUrlByTab[tab.id]) {
+//     if (tab.url === lastUrlByTab[tab.id]) {
+//       console.log(`URL matched with last URL in the tab!`);
+//       return true;
+//     }
+//   }
+//   console.log(`URL not matched with last URL in the tab!`);
+//   return false;
+// }
+
+function applyBlurScreen(tabId) {
+  chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    files: ["./src/content/blurScreen.js"]
+  });
 }
 
 // Timer Handler
 let resetTimerId;
 let intervalId;
 let timeRemaining = settings.selectedTime * 60 * 1000;
-let blocked = false;
 let alreadyRunning = false;
 
 function startTimer(tabId) {
   if (alreadyRunning) {
+    console.log(`Already cooking!`);
     return ;
   }
-  console.log(`Timer started!`);
+  console.log(`Timer started with ${timeRemaining / 1000} seconds remaining!`);
   alreadyRunning = true;
   intervalId = setInterval(() => {
     timeRemaining -= 1000;
@@ -77,7 +84,7 @@ function startTimer(tabId) {
       startResetTimer();
       chrome.scripting.executeScript({
         target: { tabId: tabId },
-        files: ["./src/content/content.js"]
+        files: ["./src/content/blurScreen.js"]
       });
     }
   }, 1000);
@@ -98,91 +105,63 @@ function startResetTimer() {
   }
   console.log(`Reset Timer started!`);
   resetTimerId = setTimeout(() => {
-    pauseTimer();
     timeRemaining = settings.selectedTime * 60 * 1000;
+    pauseTimer();
+    alreadyRunning = false;
     blocked = false;
   }, settings.resetTimerTime * 60 * 1000);
 }
 
 // Events handlers
-function handleTabUpdate(tabId, changeInfo, tab) {
-  chrome.storage.sync.get(`running`, (result) => {
-    if (result.running && !blocked) {
-      if (changeInfo.status === `complete` && checkStartUrl(tab)) {
-        if (checkLastUrl(tab)) {
-          console.log(`Tab updated!: ${tab.url}`);
-          startTimer(tabId);
-          if (resetTimerId) {
-            clearTimeout(resetTimerId);
-            resetTimerId = null;
-          }
-        }
-      }
-      else {
-        if (intervalId && !alreadyRunning) {
-          console.log("1");
-          pauseTimer()
-          startResetTimer();
-        }
-      }
-    }
-  });
-}
-
-function handleTabActivated(activeInfo) {
-  chrome.tabs.get(activeInfo.tabId, (tab) => {
-    chrome.storage.sync.get(`running`, (result) => {
-      if (result.running && !blocked) {
-        console.log(`Tab activated!: ${tab.url}`);
-        if (checkStartUrl(tab)) {
-          if (checkLastUrl(tab)) {
-            startTimer(tab.id);
-            if (resetTimerId) {
-              clearTimeout(resetTimerId);
-              resetTimerId = null;
-            }
-          }
-        } 
-        else {
-          if (intervalId) {
-            console.log("2");
-            pauseTimer();
-            startResetTimer();
-          }
-        } 
-      }
-    });
-  });
-}
-
-function handleHistoryStateUpdate(details) {
+function handleTabEvent(tabId, tab, eventType) {
   chrome.storage.sync.get('running', (result) => {
-    if (result.running && !blocked) {
-      chrome.tabs.get(details.tabId, (tab) => {
-        if (checkStartUrl(tab)) {
-          if (!checkLastUrl(tab)) {
-            console.log(`SPA navigation detected and matched: ${tab.url}`);
-            startTimer(tab.id);
-            if (resetTimerId) {
-              clearTimeout(resetTimerId);
-              resetTimerId = null;
-            }
-          }
-        } 
-        else {
-          console.log(`SPA navigation detected but not in blocklist: ${tab.url}`);
-          if (intervalId) {
-            console.log("3");
-            pauseTimer();
-            startResetTimer();
-          }
+    if (!result.running || blocked) 
+      return;
+
+    if (checkStartUrl(tab)) {
+      if (!alreadyRunning) {
+        console.log(`[${eventType}] Starting timer for: ${tab.url}`);
+        startTimer(tabId);
+        if (resetTimerId) {
+          clearTimeout(resetTimerId);
+          resetTimerId = null;
         }
-      });
+      } 
+      else {
+        console.log(`[${eventType}] Timer already running for: ${tab.url}`);
+      }
+    } 
+    else {
+      console.log(`[${eventType}] URL not in blocklist: ${tab.url}`);
+      if (intervalId) {
+        console.log(`[${eventType}] Pausing timer for: ${tab.url}`);
+        pauseTimer();
+        startResetTimer();
+      }
     }
   });
 }
 
-// Events listerners
-chrome.tabs.onUpdated.addListener(handleTabUpdate);
-chrome.tabs.onActivated.addListener(handleTabActivated);
-chrome.webNavigation.onHistoryStateUpdated.addListener(handleHistoryStateUpdate);
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete') {
+    if (!blocked)
+      handleTabEvent(tabId, tab, 'onUpdated');
+    else
+      applyBlurScreen(tabId);
+  }
+});
+
+chrome.tabs.onActivated.addListener((activeInfo) => {
+  chrome.tabs.get(activeInfo.tabId, (tab) => {
+    if (!blocked)
+      handleTabEvent(activeInfo.tabId, tab, 'onActivated');
+    else
+      applyBlurScreen(activeInfo.tabId);
+  });
+});
+
+chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
+  chrome.tabs.get(details.tabId, (tab) => {
+    handleTabEvent(details.tabId, tab, 'onHistoryStateUpdated');
+  });
+});
