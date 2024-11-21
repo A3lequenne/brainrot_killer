@@ -34,6 +34,7 @@ function checkStartUrl(tab) {
   }
   for (let url of notWantedUrls) {
     if (tab.url.startsWith(url)) {
+      console.log(`URL found in the tab!`);
       return true;
     }
   }
@@ -48,13 +49,17 @@ let timeRemaining = settings.selectedTime * 60 * 1000;
 let blocked = false;
 
 function startTimer(tabId) {
+  if (intervalId) {
+    return ;
+  }
   console.log(`Timer started!`);
   intervalId = setInterval(() => {
     timeRemaining -= 1000;
-    if (timeRemaining <= 0) {
+    if (timeRemaining <= 0 && !blocked) {
       clearInterval(intervalId);
       console.log(`Timer finished!`);
       blocked = true;
+      startResetTimer();
       chrome.scripting.executeScript({
         target: { tabId: tabId },
         files: ["./src/content/content.js"]
@@ -75,8 +80,8 @@ function startResetTimer() {
   if (resetTimerId) {
     clearTimeout(resetTimerId);
   }
+  console.log(`Reset Timer started!`);
   resetTimerId = setTimeout(() => {
-    console.log(`Reset Timer started!`);
     pauseTimer();
     timeRemaining = settings.selectedTime * 60 * 1000;
     blocked = false;
@@ -86,8 +91,9 @@ function startResetTimer() {
 // Events handlers
 function handleTabUpdate(tabId, changeInfo, tab) {
   chrome.storage.sync.get(`running`, (result) => {
-    if (result.running) {
+    if (result.running && !blocked) {
       if (changeInfo.status === `complete` && checkStartUrl(tab)) {
+        console.log(`Tab updated!: ${tab.url}`);
         startTimer(tabId);
         if (resetTimerId) {
           clearTimeout(resetTimerId);
@@ -95,8 +101,10 @@ function handleTabUpdate(tabId, changeInfo, tab) {
         }
       }
       else {
-        pauseTimer();
-        startResetTimer();
+        if (intervalId) {
+          pauseTimer()
+          startResetTimer();
+        }
       }
     }
   });
@@ -105,7 +113,7 @@ function handleTabUpdate(tabId, changeInfo, tab) {
 function handleTabActivated(activeInfo) {
   chrome.tabs.get(activeInfo.tabId, (tab) => {
     chrome.storage.sync.get(`running`, (result) => {
-      if (result.running) {
+      if (result.running && !blocked) {
         console.log(`Tab activated!: ${tab.url}`);
         if (checkStartUrl(tab)) {
           startTimer(tab.id);
@@ -115,14 +123,41 @@ function handleTabActivated(activeInfo) {
           }
         } 
         else {
-          pauseTimer();
-          startResetTimer();
-        }
+          if (intervalId) {
+            pauseTimer();
+            startResetTimer();
+          }
+        } 
       }
     });
+  });
+}
+
+function handleHistoryStateUpdate(details) {
+  chrome.storage.sync.get('running', (result) => {
+    if (result.running && !blocked) {
+      chrome.tabs.get(details.tabId, (tab) => {
+        if (checkStartUrl(tab)) {
+          console.log(`SPA navigation detected and matched: ${tab.url}`);
+          startTimer(tab.id);
+          if (resetTimerId) {
+            clearTimeout(resetTimerId);
+            resetTimerId = null;
+          }
+        } 
+        else {
+          console.log(`SPA navigation detected but not in blocklist: ${tab.url}`);
+          if (intervalId) {
+            pauseTimer();
+            startResetTimer();
+          }
+        }
+      });
+    }
   });
 }
 
 // Events listerners
 chrome.tabs.onUpdated.addListener(handleTabUpdate);
 chrome.tabs.onActivated.addListener(handleTabActivated);
+chrome.webNavigation.onHistoryStateUpdated.addListener(handleHistoryStateUpdate);
