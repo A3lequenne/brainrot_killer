@@ -1,10 +1,11 @@
 // Initial setup
 let blocked = false;
+let toBeUnblocked = new Map();
 let lastUrlByTab = {};
 let settings = {
   running: false, // Not activated by default
   selectedTime: 0.25, // 15 minutes by default A changer
-  resetTimerTime: 0.5 // 10 minutes by default A changer
+  resetTimerTime: 0.25 // 10 minutes by default A changer
 };
 
 chrome.storage.sync.get([`running`, `selectedTime`, `resetTimerTime`], (result) => {
@@ -44,22 +45,20 @@ function checkStartUrl(tab) {
   return false;
 }
 
-// function checkLastUrl(tab) {
-//   if (lastUrlByTab[tab.id]) {
-//     if (tab.url === lastUrlByTab[tab.id]) {
-//       console.log(`URL matched with last URL in the tab!`);
-//       return true;
-//     }
-//   }
-//   console.log(`URL not matched with last URL in the tab!`);
-//   return false;
-// }
-
 function applyBlurScreen(tabId) {
   chrome.scripting.executeScript({
     target: { tabId: tabId },
     files: ["./src/content/blurScreen.js"]
   });
+  toBeUnblocked.set(tabId, true);
+}
+
+function removeBlurScreen(tabId) {
+  chrome.scripting.executeScript({
+    target: { tabId: tabId },
+    files: ["./src/content/unblurScreen.js"]
+  });
+  toBeUnblocked.delete(tabId);
 }
 
 // Timer Handler
@@ -82,10 +81,8 @@ function startTimer(tabId) {
       console.log(`Timer finished!`);
       blocked = true;
       startResetTimer();
-      chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        files: ["./src/content/blurScreen.js"]
-      });
+      toBeUnblocked.clear();
+      applyBlurScreen(tabId);
     }
   }, 1000);
 }
@@ -144,18 +141,26 @@ function handleTabEvent(tabId, tab, eventType) {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete') {
-    if (!blocked)
-      handleTabEvent(tabId, tab, 'onUpdated');
-    else
+    if (!blocked) {
+      if (toBeUnblocked.has(tabId))
+        removeBlurScreen(tabId);
+      else
+        handleTabEvent(tabId, tab, 'onUpdated');
+    }
+    else if (checkStartUrl(tab))
       applyBlurScreen(tabId);
   }
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
   chrome.tabs.get(activeInfo.tabId, (tab) => {
-    if (!blocked)
-      handleTabEvent(activeInfo.tabId, tab, 'onActivated');
-    else
+    if (!blocked) {
+      if (toBeUnblocked.has(activeInfo.tabId))
+        removeBlurScreen(activeInfo.tabId);
+      else
+        handleTabEvent(activeInfo.tabId, tab, 'onActivated');
+    }
+    else if (checkStartUrl(tab))
       applyBlurScreen(activeInfo.tabId);
   });
 });

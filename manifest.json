@@ -18,7 +18,11 @@
   ],
   "action":{
     "default_popup": "./src/popup/popup.html",
-    "default_icon": "./assets/brainrot_killer_icon.jpg"
+    "default_icon": {
+      "16": "./assets/brainrot_killer_icon.jpg",
+      "48": "./assets/brainrot_killer_icon.jpg",
+      "128": "./assets/brainrot_killer_icon.jpg"
+    }
   },
   "background": {
     "service_worker": "./src/background/background.js"
