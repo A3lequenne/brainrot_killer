@@ -10,7 +10,14 @@
       <h1 class="text-lg font-bold mb-4 text-center">BrainRot Killer</h1>
       <div class="flex justify-center mb-4">
         <button id="btnTest" class="bg-blue-500 text-white px-4 py-2 rounded mx-4">Test</button>
-        <button id="btnOnOff" class="bg-green-500 text-white px-4 py-2 rounded mx-4">Running</button>
+        <label for="btnOnOff" class="flex items-center cursor-pointer mx-4">
+          <div class="relative">
+            <input id="btnOnOff" type="checkbox" class="sr-only">
+            <div class="block bg-gray-600 w-14 h-8 rounded-full"></div>
+            <div class="dot absolute left-1 top-1 bg-white w-6 h-6 rounded-full transition"></div>
+          </div>
+          <div class="ml-3 font-medium">Running</div>
+        </label>
       </div>
       <div class="flex justify-center mb-4">
         <label for="timeSelect" class="mr-2 items-center text-sm">Time (minutes):</label>

@@ -1,47 +1,23 @@
-let running = true;
-
 const btnTest = document.getElementById("btnTest");
-
 const btnOnOff = document.getElementById("btnOnOff");
-
 const timeSelect = document.getElementById("timeSelect");
 const btnValidate = document.getElementById("btnValidate");
-
 const resetTimerTime = document.getElementById("resetTimerTime");
 const btnResetTimer = document.getElementById("btnResetTimer");
-
-
-
-function updateButton() {
-  if (running) {
-    btnOnOff.innerText = "Running";
-    btnOnOff.classList.remove("bg-red-500");
-    btnOnOff.classList.add("bg-green-500");
-  }
-  else {
-    btnOnOff.innerText = "Not Running";
-    btnOnOff.classList.remove("bg-green-500");
-    btnOnOff.classList.add("bg-red-500");
-  }
-}
+const toggleLabel = document.querySelector("label[for='btnOnOff'] .font-medium");
 
 chrome.storage.sync.get("running", (result) => {
-  if (result.running !== undefined) running = result.running;
-  updateButton();
+  running = result.running || false;
+  btnOnOff.checked = running;
+  updateToggleText();
 });
 
-btnTest.addEventListener("click", () => {
-  console.log("Test!");
-});
-
-btnOnOff.addEventListener("click", () => {
-  running = !running;
-  if (chrome.storage && chrome.storage.sync) {
-    chrome.storage.sync.set({ running: running }, () => {
-      console.log("Running : ${running}");
-      updateButton();
-    });
-  }
+btnOnOff.addEventListener("change", () => {
+  running = btnOnOff.checked;
+  chrome.storage.sync.set({ running }, () => {
+    updateToggleText();
+    console.log("Running : ${running}");
+  });
 });
 
 btnValidate.addEventListener("click", () => {
@@ -61,3 +37,11 @@ btnResetTimer.addEventListener("click", () => {
     });
   }
 });
+
+function updateToggleText() {
+  toggleLabel.textContent = running ? "On" : "Off";
+}
+
+// btnTest.addEventListener("click", () => {
+//     console.log("Test!");
+//   });

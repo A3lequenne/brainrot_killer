@@ -2,3 +2,22 @@ body {
   width: 250px;
   height: auto;
 }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+input:checked +_.block {
+  background-color: #48bb78;
+}
+
+input:checked + .block .dot {
+  transform: translate(6rem);
+}
