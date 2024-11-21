@@ -1,4 +1,5 @@
 // Initial setup
+let lastUrlByTab = {};
 let settings = {
   running: false, // Not activated by default
   selectedTime: 0.25, // 15 minutes by default A changer
@@ -32,8 +33,13 @@ function checkStartUrl(tab) {
     console.log(`No URL found!`);
     return false;
   }
+  if (lastUrlByTab[tab.id] === tab.url) {
+    console.log(`URL already processed: ${tab.url}`);
+    return false;
+  }
   for (let url of notWantedUrls) {
     if (tab.url.startsWith(url)) {
+      lastUrlByTab[tab.id] = tab.url;
       console.log(`URL found in the tab!`);
       return true;
     }
