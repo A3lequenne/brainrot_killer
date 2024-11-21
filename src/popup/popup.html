@@ -10,9 +10,9 @@
       <h1 class="text-lg font-bold mb-4 text-center">BrainRot Killer</h1>
       <div class="flex justify-center mb-4">
         <button id="btnTest" class="bg-blue-500 text-white px-4 py-2 rounded mx-4">Test</button>
-        <button id="btnOnOff" class="bg-green-500 text-white px-4 py-2 rounded mx-4">Start</button>
+        <button id="btnOnOff" class="bg-green-500 text-white px-4 py-2 rounded mx-4">Running</button>
       </div>
-      <div class="flex justify-center">
+      <div class="flex justify-center mb-4">
         <label for="timeSelect" class="mr-2 items-center text-sm">Time (minutes):</label>
         <select id="timeSelect" class="bg-gray-200 text-gray-700 px-4 rounded">
           <option value="0">0</option>
@@ -21,7 +21,16 @@
           <option value="5">5</option>
           <option value="15">15</option>
         </select>
-        <button id="btnValidate" class="bg-blue-500 text-sm text-white px-4 py-2 rounded ml-2">Validate</button>
+        <button id="btnValidate" class="bg-blue-500 text-sm text-white px-4 py-2 rounded ml-2">Ok</button>
+      </div>
+      <div class="flex justify-center">
+        <label for="resetTimerTime" class="mr-2 items-center text-sm">Reset Timer (minutes):</label>
+        <select id="resetTimerTime" class="bg-gray-200 text-gray-700 px-4 rounded">
+          <option value="0">0</option>
+          <option value="10">10</option>
+          <option value="60">60</option>
+        </select>
+        <button id="btnResetTimer" class="bg-blue-500 text-sm text-white px-4 py-2 rounded ml-2">Ok</button>
       </div>
       <script src="./popup.js"></script>
     </div>
