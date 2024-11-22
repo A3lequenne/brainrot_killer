@@ -2,9 +2,9 @@
 let blocked = false;
 let toBeUnblocked = new Map(); // A enlever, mettre un tableau à la place si pas besoin de clé unique
 let lastUrlByTab = {};
-let settings = {
+let settings = { // A changer, différents pour les tests
   running: false, // Not activated by default
-  selectedTime: 0.25, // 15 minutes by default A changer
+  selectedTime: 0.1, // 15 minutes by default A changer
   resetTimerTime: 0.25 // 10 minutes by default A changer
 };
 
@@ -17,7 +17,7 @@ chrome.storage.sync.get([`running`, `selectedTime`, `resetTimerTime`], (result) 
 });
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.storage.sync.set({ running: false, selectedTime: 0.25, resetTimerTime: 0.5 }, () => { // Changer les valeurs d'initialisation
+  chrome.storage.sync.set({ running: false, selectedTime: 0.1, resetTimerTime: 2 }, () => { // Changer les valeurs d'initialisation
   });
 });
 
@@ -169,4 +169,11 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
   chrome.tabs.get(details.tabId, (tab) => {
     handleTabEvent(details.tabId, tab, 'onHistoryStateUpdated');
   });
+});
+
+// Middleware Event Utils
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === `closeTab` && sender.tab) {
+    chrome.tabs.remove(sender.tab.id);
+  }
 });
