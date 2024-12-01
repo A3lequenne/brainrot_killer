@@ -57,9 +57,9 @@ if (!document.getElementById(`blurOverlay`)) {
   refreshBtn.style.border = 'none';
   refreshBtn.style.borderRadius = '0.25rem';
   refreshBtn.style.cursor = 'pointer';
-  refreshBtn.addEventListener('click', () => {
-    location.reload();
-  });
+  // refreshBtn.addEventListener('click', () => {
+  //   location.reload();
+  // });
 
   blurOverlay.appendChild(message);
 

@@ -1,6 +1,6 @@
 // Initial setup
 let blocked = false;
-let toBeUnblocked = new Map(); // A enlever, mettre un tableau à la place si pas besoin de clé unique
+let notAllowed = new Map(); // A enlever, mettre un tableau à la place si pas besoin de clé unique
 let lastUrlByTab = {};
 let settings = { // A changer, différents pour les tests
   running: false, // Not activated by default
@@ -45,20 +45,27 @@ function checkStartUrl(tab) {
   return false;
 }
 
-function applyBlurScreen(tabId) {
+function applyOneBlurScreen(tabId) {
   chrome.scripting.executeScript({
     target: { tabId: tabId },
     files: ["./src/content/blurScreen.js"]
   });
-  toBeUnblocked.set(tabId, true);
 }
 
-function removeBlurScreen(tabId) {
-  chrome.scripting.executeScript({
-    target: { tabId: tabId },
-    files: ["./src/content/unblurScreen.js"]
+function applyBlurScreen(notAllowed) {
+  notAllowed.forEach((value, tabId) => {
+    applyOneBlurScreen(tabId);
   });
-  toBeUnblocked.delete(tabId);
+}
+
+function removeBlurScreen(notAllowed) {
+  notAllowed.forEach((value, tabId) => {
+    chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      files: ["./src/content/unblurScreen.js"]
+    });
+    notAllowed.delete(tabId);
+  });
 }
 
 // Timer Handler
@@ -81,8 +88,7 @@ function startTimer(tabId) {
       console.log(`Timer finished!`);
       blocked = true;
       startResetTimer();
-      toBeUnblocked.clear();
-      applyBlurScreen(tabId);
+      applyBlurScreen(notAllowed);
     }
   }, 1000);
 }
@@ -104,6 +110,7 @@ function startResetTimer() {
   resetTimerId = setTimeout(() => {
     timeRemaining = settings.selectedTime * 60 * 1000;
     pauseTimer();
+    unblurScreen(notAllowed);
     alreadyRunning = false;
     blocked = false;
   }, settings.resetTimerTime * 60 * 1000);
@@ -112,13 +119,22 @@ function startResetTimer() {
 // Events handlers
 function handleTabEvent(tabId, tab, eventType) {
   chrome.storage.sync.get('running', (result) => {
-    if (!result.running || blocked) 
-      return;
+    if (!result.running)
+      return ;
+
+    if (blocked && checkStartUrl(tab)) {
+      if (!notAllowed.has(tabId)) {
+        notAllowed.set(tabId, true);
+      }
+      applyOneBlurScreen(tabId);
+    }
 
     if (checkStartUrl(tab)) {
       if (!alreadyRunning) {
         console.log(`[${eventType}] Starting timer for: ${tab.url}`);
         startTimer(tabId);
+        if (!notAllowed.has(tabId))
+          notAllowed.set(tabId, true);
         if (resetTimerId) {
           clearTimeout(resetTimerId);
           resetTimerId = null;
@@ -129,6 +145,8 @@ function handleTabEvent(tabId, tab, eventType) {
       }
     } 
     else {
+      if (notAllowed.has(tabId))
+        notAllowed.delete(tabId);
       console.log(`[${eventType}] URL not in blocklist: ${tab.url}`);
       if (intervalId) {
         console.log(`[${eventType}] Pausing timer for: ${tab.url}`);
@@ -141,27 +159,13 @@ function handleTabEvent(tabId, tab, eventType) {
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === 'complete') {
-    if (!blocked) {
-      if (toBeUnblocked.has(tabId))
-        removeBlurScreen(tabId);
-      else
-        handleTabEvent(tabId, tab, 'onUpdated');
-    }
-    else if (checkStartUrl(tab))
-      applyBlurScreen(tabId);
+    handleTabEvent(tabId, tab, 'onUpdated');
   }
 });
 
 chrome.tabs.onActivated.addListener((activeInfo) => {
   chrome.tabs.get(activeInfo.tabId, (tab) => {
-    if (!blocked) {
-      if (toBeUnblocked.has(activeInfo.tabId))
-        removeBlurScreen(activeInfo.tabId);
-      else
-        handleTabEvent(activeInfo.tabId, tab, 'onActivated');
-    }
-    else if (checkStartUrl(tab))
-      applyBlurScreen(activeInfo.tabId);
+    handleTabEvent(activeInfo.tabId, tab, 'onActivated');
   });
 });
 
@@ -169,6 +173,12 @@ chrome.webNavigation.onHistoryStateUpdated.addListener((details) => {
   chrome.tabs.get(details.tabId, (tab) => {
     handleTabEvent(details.tabId, tab, 'onHistoryStateUpdated');
   });
+});
+
+chrome.tabs.onRemoved.addListener((tabId, removeInfo) => {
+  if (notAllowed.has(tabId)) {
+    notAllowed.delete(tabId);
+  }
 });
 
 // Middleware Event Utils
